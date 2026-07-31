@@ -1,14 +1,16 @@
 === WPYog Fleet – Booking Manager for Taxi, Cab & Travel Businesses ===
-Contributors: wpyog, poppinsdigital
+Contributors: wpyog
 Tags: booking manager, taxi booking, cab booking, fleet management, vehicle booking
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 3.5.5
+Stable tag: 3.5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Manage bookings, vehicles, drivers, payments, advances, balances, and trip expenses from inside your WordPress dashboard.
+
+**Live Demo:** [View Live Demo](https://demo.poppinsdigital.com/wpyog-fleet/)
 
 == Description ==
 
@@ -91,10 +93,9 @@ WPYog Fleet is part of the WPYog plugin ecosystem by Poppins Digital. WPYog plug
 
 Current WPYog plugins include:
 
-* WPYog Team
-* WPYog Docs
-* WPYog News
-* WPYog Fleet
+* [WPYog Team](https://wordpress.org/plugins/wpyog-team/)
+* [WPYog Docs](https://wordpress.org/plugins/wpyog-documents/)
+* [WPYog News](https://wordpress.org/plugins/wpyog-news/)
 
 = User Roles =
 
@@ -184,6 +185,12 @@ Yes. All strings are internationalised using the `wpyog-fleet` text domain and a
 12. Admin Settings — company name, booking prefix, ops contact, Google review link
 
 == Changelog ==
+
+= 3.5.6 =
+* readme.txt: removed `poppinsdigital` from Contributors (not a valid WordPress.org username — was triggering an import warning); `wpyog` remains as the sole contributor
+* readme.txt: added links to the other WPYog plugins (WPYog Team, WPYog Docs, WPYog News) in the "Practical WordPress Plugin For Business Workflows" section, and removed the plugin's own self-referencing entry from that list
+* readme.txt: added a Live Demo link at the top of the readme
+* No functional or visual changes — this is a readme/metadata-only release
 
 = 3.5.5 =
 * WordPress.org Plugin Review: replaced the "sanitized downstream" pattern (raw `wp_unslash( $_POST )` passed into a save function, with per-field sanitization happening inside that function) with a new WPYOGFLEET_Input class that sanitizes every field individually and directly at the point it is read from $_POST, using sanitize_text_field()/sanitize_textarea_field() wrapped around each $_POST access. Applied across all 28 form/AJAX save paths for vehicles, drivers, companies, bookings, payments, expenses, and settings. The previous phpcs:ignore-suppressed pattern was correct in that data was genuinely sanitized before use, but reviewers cannot verify sanitization that happens inside a separately-called function — this update makes the sanitization visible and verifiable at the exact line the input is read, which is what WordPress.org requires
