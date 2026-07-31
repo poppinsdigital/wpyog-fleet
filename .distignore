@@ -1,0 +1,9 @@
+.git
+.github
+.wordpress-org
+.distignore
+.gitignore
+.gitattributes
+.DS_Store
+node_modules
+*.zip
