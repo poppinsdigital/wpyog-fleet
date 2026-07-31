@@ -4,15 +4,15 @@ Tags: booking manager, taxi booking, cab booking, fleet management, vehicle book
 Requires at least: 5.6
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 3.5.6
+Stable tag: 3.5.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Manage bookings, vehicles, drivers, payments, advances, balances, and trip expenses from inside your WordPress dashboard.
 
-**Live Demo:** [View Live Demo](https://demo.poppinsdigital.com/wpyog-fleet/)
-
 == Description ==
+
+**Live Demo:** [View Live Demo](https://demo.poppinsdigital.com/wpyog-fleet/)
 
 WPYog Fleet is a simple booking and vehicle operations plugin for WordPress, built for taxi operators, cab rental companies, tour agencies, transport businesses, and small travel companies.
 
@@ -185,6 +185,10 @@ Yes. All strings are internationalised using the `wpyog-fleet` text domain and a
 12. Admin Settings — company name, booking prefix, ops contact, Google review link
 
 == Changelog ==
+
+= 3.5.7 =
+* readme.txt: moved the Live Demo link inside the Description section — it was placed between the tagline and the Description heading, which WordPress.org treats as page metadata (it got swallowed into the meta description as plain text instead of rendering as a link on the plugin page)
+* No functional or visual changes — this is a readme/metadata-only release
 
 = 3.5.6 =
 * readme.txt: removed `poppinsdigital` from Contributors (not a valid WordPress.org username — was triggering an import warning); `wpyog` remains as the sole contributor
