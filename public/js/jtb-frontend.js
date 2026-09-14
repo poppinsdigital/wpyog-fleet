@@ -196,6 +196,7 @@
 
         // Balance calculator
         $('#bf-amount, #bf-advance').on('input', calcBalance);
+        $(document).on('change', '#bf-gst', calcBalance);
         $(document).on('input change', '#bf-advance', function () {
             var v = parseFloat($(this).val()) || 0;
             v > 0 ? $('#bf-advance-details').slideDown(150) : $('#bf-advance-details').slideUp(150);
@@ -707,6 +708,7 @@
                 $('#bf-from').val(b.pickup_location);
                 $('#bf-to').val(b.drop_location);
                 $('#bf-amount').val(b.booking_amount);
+                $('#bf-gst').prop('checked', !!parseInt(b.gst_applicable, 10));
                 $('#bf-advance').val(b.advance_amount);
                 if (b.advance_payment_mode) $('#bf-advance-mode').val(b.advance_payment_mode);
                 $('#bf-advance-received').val(b.advance_received_by || '');
@@ -866,6 +868,7 @@
             outsourced_driver_mobile:  isOutsourced ? $('#bf-out-driver-mobile').val()  : '',
             outsourced_vehicle_number: isOutsourced ? $('#bf-out-vehicle-number').val() : '',
             booking_amount:       $('#bf-amount').val(),
+            gst_applicable:       $('#bf-gst').is(':checked') ? 1 : 0,
             advance_amount:       $('#bf-advance').val() || 0,
             advance_payment_mode: $('#bf-advance-mode').val() || 'cash',
             advance_received_by:  $('#bf-advance-received').val(),
@@ -906,8 +909,12 @@
         var html = '';
 
         // Summary strip
+        var gstOn = !!parseInt(b.gst_applicable, 10);
+        var gstAmt = parseFloat(b.gst_amount) || 0;
         html += '<div class="jtbfe-detail-summary" id="jtbfe-ds">'
-            + ds('Booking Amount', fmt(b.booking_amount), '')
+            + ds(gstOn ? 'Booking Amount (excl. GST)' : 'Booking Amount', fmt(b.booking_amount), '')
+            + (gstOn ? ds('GST (5%)', fmt(gstAmt), '') : '')
+            + (gstOn ? ds('Total (incl. GST)', fmt((parseFloat(b.booking_amount) || 0) + gstAmt), '') : '')
             + ds('Total Received', fmt(b.total_paid || 0), 'is-received')
             + ds('Balance Pending', fmt(bal), bal > 0 ? 'is-pending' : 'is-clear')
             + ds('Expenses', fmt(b.total_expenses || 0), 'is-expense')
@@ -1146,8 +1153,8 @@
         if (isOutBooking) {
             var oDrvName   = b.outsourced_driver_name ? b.outsourced_driver_name.toUpperCase() : 'TO BE ASSIGNED';
             var oDrvMobile = b.outsourced_driver_mobile || '';
-            drvLine = oDrvName + (oDrvMobile ? ' (' + oDrvMobile + ')' : '') + ' [Outsourced]';
-            vehLine = (b.outsourced_vehicle_number || '—') + ' [Outsourced]';
+            drvLine = oDrvName + (oDrvMobile ? ' (' + oDrvMobile + ')' : '');
+            vehLine = (b.outsourced_vehicle_number || '—');
         } else {
             // Driver — uppercase
             var drvName   = b.driver_name ? b.driver_name.toUpperCase() : 'TO BE ASSIGNED';
@@ -1163,7 +1170,7 @@
         var statusMap = {new:'New',confirmed:'Confirmed',ongoing:'Ongoing',completed:'Completed',closed:'Closed',cancelled:'Cancelled'};
         var statusStr = statusMap[b.status] || ucfirst(b.status);
 
-        var amt = fmt(b.booking_amount);
+        var amt = fmt((parseFloat(b.booking_amount) || 0) + (parseFloat(b.gst_amount) || 0));
         var paid = fmt(b.total_paid);
         var due  = fmt(b.balance_amount > 0 ? b.balance_amount : 0);
 
@@ -1226,15 +1233,15 @@
         var site  = (window.WPYOGFLEETFE && WPYOGFLEETFE.site_name) || 'Jagat Travels';
         var date  = b.start_date ? fmtDatetime(b.start_date) : '—';
         var route = esc(b.pickup_location || '?') + ' → ' + esc(b.drop_location || '?');
-        var amt   = fmt(b.booking_amount);
+        var amt   = fmt((parseFloat(b.booking_amount) || 0) + (parseFloat(b.gst_amount) || 0));
         var paid  = fmt(b.total_paid);
         var due   = fmt(b.balance_amount > 0 ? b.balance_amount : 0);
         var paxName   = b.passenger_name   || b.customer_name;
         var paxMobile = b.passenger_mobile || b.customer_mobile;
         var isOutEmail = !!(parseInt(b.is_outsourced, 10));
-        var vehDisplay = isOutEmail ? (esc(b.outsourced_vehicle_number || '—') + ' (Outsourced)') : esc(b.vehicle_name || '—');
+        var vehDisplay = isOutEmail ? esc(b.outsourced_vehicle_number || '—') : esc(b.vehicle_name || '—');
         var drvDisplay = isOutEmail
-            ? esc(b.outsourced_driver_name || 'To be assigned') + (b.outsourced_driver_mobile ? ' | ' + b.outsourced_driver_mobile : '') + ' (Outsourced)'
+            ? esc(b.outsourced_driver_name || 'To be assigned') + (b.outsourced_driver_mobile ? ' | ' + b.outsourced_driver_mobile : '')
             : esc(b.driver_name || 'To be assigned') + (b.driver_mobile ? ' | ' + b.driver_mobile : '');
         var title, rows, closing;
         if (forW === 'driver') {
@@ -1720,7 +1727,17 @@
     function calcBalance() {
         var a = parseFloat($('#bf-amount').val()) || 0;
         var d = parseFloat($('#bf-advance').val()) || 0;
-        var b = a - d;
+        var gstOn = $('#bf-gst').is(':checked');
+        var gst = gstOn ? Math.round(a * 5) / 100 : 0;
+        var total = a + gst;
+        if (gstOn) {
+            $('#bf-gst-preview').show();
+            $('#bf-gst-val').text(fmt(gst));
+            $('#bf-total-val').text(fmt(total));
+        } else {
+            $('#bf-gst-preview').hide();
+        }
+        var b = total - d;
         $('#bf-balance-val').text(fmt(b)).css('color', b > 0 ? '#ef4444' : '#10b981');
     }
 

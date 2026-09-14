@@ -21,6 +21,9 @@ $is_edit      = ! empty( $edit_company );
     <?php if ( $wpyogfleet_notice_ok && ! empty( $_GET['deleted'] ) ) : ?>
     <div class="jtb-notice jtb-notice-success">Company deleted.</div>
     <?php endif; ?>
+    <?php if ( $wpyogfleet_notice_ok && isset( $_GET['error'] ) && 'duplicate' === $_GET['error'] ) : ?>
+    <div class="jtb-notice jtb-notice-error">A company with this name already exists.</div>
+    <?php endif; ?>
 
     <div class="jtb-two-col-layout">
 

@@ -2,9 +2,9 @@
 Contributors: wpyog
 Tags: booking manager, taxi booking, cab booking, fleet management, vehicle booking
 Requires at least: 5.6
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.5.7
+Stable tag: 3.5.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -185,6 +185,17 @@ Yes. All strings are internationalised using the `wpyog-fleet` text domain and a
 12. Admin Settings — company name, booking prefix, ops contact, Google review link
 
 == Changelog ==
+
+= 3.5.9 =
+* readme.txt: bumped "Tested up to" to 7.1 to clear the WordPress.org Plugin Check "outdated_tested_upto_header" error — no functional or visual changes
+
+= 3.5.8 =
+* GST on bookings: new optional "Add GST (5%)" toggle on the booking form. The Booking Amount is treated as the pre-GST sub-total; when GST is applied the payable total becomes sub-total + 5%, and balances/paid are tracked against that total. Booking detail shows the Sub-total / GST / Total breakdown. Stored as new columns (gst_applicable, gst_rate, gst_amount) added automatically on upgrade — existing bookings are unaffected (GST 0)
+* Bookings export (CSV): added Customer Type (Individual/Corporate), Vehicle Number, Vehicle Source (Own/Outsourced), and split amounts — Amount (excl. GST), GST, and Amount (incl. GST)
+* Bookings list filter: the vehicle dropdown now shows the registration number next to the vehicle name
+* Share messages (WhatsApp & email, customer/driver/ops): removed the "[Outsourced]" / "(Outsourced)" tags — the driver and vehicle now show just the name/number; the ops Total now reflects GST when it applies
+* Booking form: the End Date field is now labelled optional (start and end time were already optional)
+* Vehicles & Companies: creating or renaming to a name that already exists is now blocked with a clear message (case-insensitive; an edit can keep its own name)
 
 = 3.5.7 =
 * readme.txt: moved the Live Demo link inside the Description section — it was placed between the tagline and the Description heading, which WordPress.org treats as page metadata (it got swallowed into the meta description as plain text instead of rendering as a link on the plugin page)

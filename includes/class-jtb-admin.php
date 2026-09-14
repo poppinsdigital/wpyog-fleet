@@ -192,11 +192,13 @@ class WPYOGFLEET_Admin {
         if ( $page === 'wpyogfleet-vehicles' ) {
             if ( isset( $_SERVER['REQUEST_METHOD'] ) && 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['wpyogfleet_vehicle_nonce'] ) ) {
                 check_admin_referer( 'wpyogfleet_vehicle_save', 'wpyogfleet_vehicle_nonce' );
-                $id = absint( $_POST['vehicle_id'] ?? 0 );
-                if ( $id ) {
-                    WPYOGFLEET_DB::update_vehicle( $id, WPYOGFLEET_Input::vehicle() );
-                } else {
-                    WPYOGFLEET_DB::insert_vehicle( WPYOGFLEET_Input::vehicle() );
+                $id  = absint( $_POST['vehicle_id'] ?? 0 );
+                $res = $id
+                    ? WPYOGFLEET_DB::update_vehicle( $id, WPYOGFLEET_Input::vehicle() )
+                    : WPYOGFLEET_DB::insert_vehicle( WPYOGFLEET_Input::vehicle() );
+                if ( is_wp_error( $res ) ) {
+                    wp_safe_redirect( admin_url( 'admin.php?page=wpyogfleet-vehicles&error=duplicate&_wpnonce=' . wp_create_nonce( 'wpyogfleet_notice' ) ) );
+                    exit;
                 }
                 wp_safe_redirect( admin_url( 'admin.php?page=wpyogfleet-vehicles&saved=1&_wpnonce=' . wp_create_nonce( 'wpyogfleet_notice' ) ) );
                 exit;
@@ -286,11 +288,19 @@ class WPYOGFLEET_Admin {
                 check_admin_referer( 'wpyogfleet_company_save', 'wpyogfleet_company_nonce' );
                 $id = absint( $_POST['company_id'] ?? 0 );
                 if ( $id ) {
-                    WPYOGFLEET_DB::update_company( $id, WPYOGFLEET_Input::company() );
+                    $res = WPYOGFLEET_DB::update_company( $id, WPYOGFLEET_Input::company() );
+                    if ( is_wp_error( $res ) ) {
+                        wp_safe_redirect( admin_url( 'admin.php?page=wpyogfleet-companies&error=duplicate&_wpnonce=' . wp_create_nonce( 'wpyogfleet_notice' ) ) );
+                        exit;
+                    }
                     WPYOGFLEET_DB::log_activity( 'company_updated', 'company', $id,
                         sanitize_text_field( wp_unslash( $_POST['company_name'] ?? '' ) ), 'Company updated' );
                 } else {
                     $new_id = WPYOGFLEET_DB::insert_company( WPYOGFLEET_Input::company() );
+                    if ( is_wp_error( $new_id ) ) {
+                        wp_safe_redirect( admin_url( 'admin.php?page=wpyogfleet-companies&error=duplicate&_wpnonce=' . wp_create_nonce( 'wpyogfleet_notice' ) ) );
+                        exit;
+                    }
                     WPYOGFLEET_DB::log_activity( 'company_created', 'company', $new_id,
                         sanitize_text_field( wp_unslash( $_POST['company_name'] ?? '' ) ), 'Company created' );
                 }
@@ -568,8 +578,8 @@ class WPYOGFLEET_Admin {
         if ( $is_outsourced ) {
             $drv_name   = ! empty( $b->outsourced_driver_name ) ? strtoupper( $b->outsourced_driver_name ) : 'TO BE ASSIGNED';
             $drv_mobile = $b->outsourced_driver_mobile ?? '';
-            $drv_line   = $drv_name . ( $drv_mobile ? ' (' . $drv_mobile . ')' : '' ) . ' [Outsourced]';
-            $veh_line   = ( $b->outsourced_vehicle_number ?: '—' ) . ' [Outsourced]';
+            $drv_line   = $drv_name . ( $drv_mobile ? ' (' . $drv_mobile . ')' : '' );
+            $veh_line   = ( $b->outsourced_vehicle_number ?: '—' );
         } else {
             // Driver: UPPERCASE NAME (mobile)
             $drv_name   = ! empty( $b->driver_name ) ? strtoupper( $b->driver_name ) : 'TO BE ASSIGNED';
@@ -586,8 +596,8 @@ class WPYOGFLEET_Admin {
         $status_map = array( 'new' => 'New', 'confirmed' => 'Confirmed', 'ongoing' => 'Ongoing', 'completed' => 'Completed', 'closed' => 'Closed', 'cancelled' => 'Cancelled' );
         $status_str = $status_map[ $b->status ] ?? ucfirst( $b->status );
 
-        // Financials
-        $amt  = '₹' . number_format( (float) $b->booking_amount, 0 );
+        // Financials — Total is the payable amount (sub-total + GST).
+        $amt  = '₹' . number_format( (float) $b->booking_amount + (float) ( $b->gst_amount ?? 0 ), 0 );
         $paid = '₹' . number_format( (float) $b->total_paid, 0 );
         $due  = '₹' . number_format( max( 0, (float) $b->balance_amount ), 0 );
 
@@ -693,7 +703,7 @@ class WPYOGFLEET_Admin {
         $num   = $b->booking_number;
         $date  = self::format_datetime( $b->start_date );
         $route = esc_html( ( $b->pickup_location ?: '?' ) . ' → ' . ( $b->drop_location ?: '?' ) );
-        $amt   = '₹' . number_format( (float) $b->booking_amount, 2 );
+        $amt   = '₹' . number_format( (float) $b->booking_amount + (float) ( $b->gst_amount ?? 0 ), 2 );
         $paid  = '₹' . number_format( (float) $b->total_paid, 2 );
         $due   = '₹' . number_format( max( 0, (float) $b->balance_amount ), 2 );
         $status_map = array( 'new'=>'New','confirmed'=>'Confirmed','ongoing'=>'Ongoing','completed'=>'Completed','closed'=>'Closed','cancelled'=>'Cancelled' );
@@ -715,8 +725,8 @@ class WPYOGFLEET_Admin {
             $rows[] = array( 'Passenger', $pax_val );
         }
         if ( ! empty( $b->is_outsourced ) ) {
-            $rows[] = array( 'Vehicle', esc_html( $b->outsourced_vehicle_number ?: '—' ) . ' <span style="color:#6b7280;font-weight:400">(Outsourced)</span>' );
-            $rows[] = array( 'Driver',  esc_html( $b->outsourced_driver_name ?: 'TBA' ) . ( $b->outsourced_driver_mobile ? ' · ' . esc_html( $b->outsourced_driver_mobile ) : '' ) . ' <span style="color:#6b7280;font-weight:400">(Outsourced)</span>' );
+            $rows[] = array( 'Vehicle', esc_html( $b->outsourced_vehicle_number ?: '—' ) );
+            $rows[] = array( 'Driver',  esc_html( $b->outsourced_driver_name ?: 'TBA' ) . ( $b->outsourced_driver_mobile ? ' · ' . esc_html( $b->outsourced_driver_mobile ) : '' ) );
         } else {
             $rows[] = array( 'Vehicle', esc_html( $b->vehicle_name ?: '—' ) );
             $rows[] = array( 'Driver',  esc_html( $b->driver_name ?: 'TBA' ) . ( $b->driver_mobile ? ' · ' . esc_html( $b->driver_mobile ) : '' ) );

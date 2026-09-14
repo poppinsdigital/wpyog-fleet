@@ -193,7 +193,7 @@ $btype = $booking->booking_type ?? 'individual';
                         </div>
                         <div class="jtb-field-row">
                             <div class="jtb-field">
-                                <label class="jtb-label">End Date</label>
+                                <label class="jtb-label">End Date <span class="jtb-field-optional">(optional)</span></label>
                                 <input type="date" name="end_date" id="jtb-end-date" class="jtb-input"
                                     value="<?php echo esc_attr( $ed_date ); ?>">
                             </div>
@@ -298,7 +298,7 @@ $btype = $booking->booking_type ?? 'individual';
                     <div class="jtb-card__body">
                         <div class="jtb-field-row">
                             <div class="jtb-field">
-                                <label class="jtb-label">Total Amount (₹) <span class="jtb-req">*</span></label>
+                                <label class="jtb-label">Booking Amount (₹, excl. GST) <span class="jtb-req">*</span></label>
                                 <input type="number" name="booking_amount" class="jtb-input jtb-input-currency" required min="0" step="0.01"
                                     value="<?php echo esc_attr( $booking->booking_amount ?? '' ); ?>"
                                     placeholder="0.00" id="jtb-booking-amount">
@@ -309,6 +309,19 @@ $btype = $booking->booking_type ?? 'individual';
                                     value="<?php echo esc_attr( $booking->advance_amount ?? '' ); ?>"
                                     placeholder="0.00" id="jtb-advance-amount">
                             </div>
+                        </div>
+                        <div class="jtb-field" style="margin-top:4px">
+                            <label class="jtb-checkbox-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                                <input type="checkbox" name="gst_applicable" value="1" id="jtb-gst-applicable"
+                                    <?php checked( ! empty( $booking->gst_applicable ) ); ?>>
+                                <span>Add GST (5%) on top of the booking amount</span>
+                            </label>
+                        </div>
+                        <div class="jtb-balance-preview" id="jtb-gst-preview" style="<?php echo empty( $booking->gst_applicable ) ? 'display:none;' : ''; ?>">
+                            <span class="jtb-balance-label">GST (5%):</span>
+                            <span class="jtb-balance-value" id="jtb-gst-value">₹0.00</span>
+                            <span class="jtb-balance-label" style="margin-left:16px">Total (incl. GST):</span>
+                            <span class="jtb-balance-value" id="jtb-total-value">₹0.00</span>
                         </div>
                         <div class="jtb-balance-preview" id="jtb-balance-preview">
                             <span class="jtb-balance-label">Balance Due:</span>
@@ -380,16 +393,30 @@ $btype = $booking->booking_type ?? 'individual';
     var amtEl = document.getElementById('jtb-booking-amount');
     var advEl = document.getElementById('jtb-advance-amount');
     var balEl = document.getElementById('jtb-balance-value');
+    var gstEl = document.getElementById('jtb-gst-applicable');
+    var gstPreview = document.getElementById('jtb-gst-preview');
+    var gstValEl = document.getElementById('jtb-gst-value');
+    var totalValEl = document.getElementById('jtb-total-value');
 
+    function inr(n) {
+        return '₹' + n.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
     function updateBalance() {
         var amt = parseFloat(amtEl.value) || 0;
         var adv = parseFloat(advEl.value) || 0;
-        var bal = amt - adv;
-        balEl.textContent = '₹' + bal.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+        var gstOn = gstEl && gstEl.checked;
+        var gst = gstOn ? Math.round(amt * 5) / 100 : 0;
+        var total = amt + gst;
+        if (gstPreview) gstPreview.style.display = gstOn ? '' : 'none';
+        if (gstValEl) gstValEl.textContent = inr(gst);
+        if (totalValEl) totalValEl.textContent = inr(total);
+        var bal = total - adv;
+        balEl.textContent = inr(bal);
         balEl.style.color = bal > 0 ? '#dc2626' : '#16a34a';
     }
     amtEl && amtEl.addEventListener('input', updateBalance);
     advEl && advEl.addEventListener('input', updateBalance);
+    gstEl && gstEl.addEventListener('change', updateBalance);
     updateBalance();
 
     // ---- Status pill toggle ----

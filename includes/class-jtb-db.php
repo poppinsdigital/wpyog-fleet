@@ -52,14 +52,39 @@ class WPYOGFLEET_DB {
         );
     }
 
+    /**
+     * True (the matching id) when another vehicle already uses this name.
+     * Case-insensitive; [$exclude_id] lets an edit keep its own name.
+     */
+    public static function vehicle_name_exists( $name, $exclude_id = 0 ) {
+        global $wpdb;
+        $name = trim( (string) $name );
+        if ( '' === $name ) {
+            return false;
+        }
+        $t  = $wpdb->prefix . 'jtb_vehicles';
+        $id = $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+            "SELECT id FROM {$t} WHERE LOWER(vehicle_name) = LOWER(%s) AND id != %d LIMIT 1",
+            $name,
+            absint( $exclude_id )
+        ) );
+        return $id ? (int) $id : false;
+    }
+
     public static function insert_vehicle( $data ) {
         global $wpdb;
+        if ( self::vehicle_name_exists( $data['vehicle_name'] ?? '' ) ) {
+            return new WP_Error( 'duplicate_vehicle', 'A vehicle with this name already exists.' );
+        }
         $wpdb->insert( $wpdb->prefix . 'jtb_vehicles', self::sanitize_vehicle( $data ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
         return $wpdb->insert_id;
     }
 
     public static function update_vehicle( $id, $data ) {
         global $wpdb;
+        if ( self::vehicle_name_exists( $data['vehicle_name'] ?? '', $id ) ) {
+            return new WP_Error( 'duplicate_vehicle', 'A vehicle with this name already exists.' );
+        }
         return $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->prefix . 'jtb_vehicles',
             self::sanitize_vehicle( $data ),
@@ -185,8 +210,30 @@ class WPYOGFLEET_DB {
         );
     }
 
+    /**
+     * True (the matching id) when another company already uses this name.
+     * Case-insensitive; [$exclude_id] lets an edit keep its own name.
+     */
+    public static function company_name_exists( $name, $exclude_id = 0 ) {
+        global $wpdb;
+        $name = trim( (string) $name );
+        if ( '' === $name ) {
+            return false;
+        }
+        $t  = $wpdb->prefix . 'jtb_companies';
+        $id = $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+            "SELECT id FROM {$t} WHERE LOWER(company_name) = LOWER(%s) AND id != %d LIMIT 1",
+            $name,
+            absint( $exclude_id )
+        ) );
+        return $id ? (int) $id : false;
+    }
+
     public static function insert_company( $data ) {
         global $wpdb;
+        if ( self::company_name_exists( $data['company_name'] ?? '' ) ) {
+            return new WP_Error( 'duplicate_company', 'A company with this name already exists.' );
+        }
         $row = self::sanitize_company( $data );
         $row['created_by'] = get_current_user_id();
         $wpdb->insert( $wpdb->prefix . 'jtb_companies', $row ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
@@ -195,6 +242,9 @@ class WPYOGFLEET_DB {
 
     public static function update_company( $id, $data ) {
         global $wpdb;
+        if ( self::company_name_exists( $data['company_name'] ?? '', $id ) ) {
+            return new WP_Error( 'duplicate_company', 'A company with this name already exists.' );
+        }
         return $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->prefix . 'jtb_companies',
             self::sanitize_company( $data ),
@@ -274,7 +324,7 @@ class WPYOGFLEET_DB {
             $params[] = $s;
         }
         if ( isset( $args['pending_only'] ) && $args['pending_only'] ) {
-            $where .= ' AND b.booking_amount > COALESCE(p.total_paid,0)';
+            $where .= ' AND (b.booking_amount + b.gst_amount) > COALESCE(p.total_paid,0)';
         }
 
         $limit  = ! empty( $args['limit'] ) ? absint( $args['limit'] ) : 500;
@@ -292,7 +342,7 @@ class WPYOGFLEET_DB {
                     c.company_name,
                     COALESCE(p.total_paid, 0)  AS total_paid,
                     COALESCE(e.total_expenses, 0) AS total_expenses,
-                    (b.booking_amount - COALESCE(p.total_paid, 0)) AS balance_amount
+                    (b.booking_amount + b.gst_amount - COALESCE(p.total_paid, 0)) AS balance_amount
                 FROM {$bt} b
                 LEFT JOIN {$vt} v ON v.id = b.vehicle_id
                 LEFT JOIN {$dt} d ON d.id = b.driver_id
@@ -374,7 +424,7 @@ class WPYOGFLEET_DB {
                     FROM {$bt} b
                     LEFT JOIN {$ct} c ON c.id = b.company_id
                     LEFT JOIN (SELECT booking_id, SUM(amount) AS total_paid FROM {$pt} WHERE is_voided = 0 GROUP BY booking_id) p ON p.booking_id = b.id
-                    {$where} AND b.booking_amount > COALESCE(p.total_paid,0)";
+                    {$where} AND (b.booking_amount + b.gst_amount) > COALESCE(p.total_paid,0)";
         } else {
             $sql = "SELECT COUNT(DISTINCT b.id)
                     FROM {$bt} b
@@ -419,7 +469,7 @@ class WPYOGFLEET_DB {
                 c.company_name, c.contact_name AS company_contact_name, c.contact_mobile AS company_contact_mobile,
                 COALESCE(p.total_paid, 0) AS total_paid,
                 COALESCE(e.total_expenses, 0) AS total_expenses,
-                (b.booking_amount - COALESCE(p.total_paid, 0)) AS balance_amount
+                (b.booking_amount + b.gst_amount - COALESCE(p.total_paid, 0)) AS balance_amount
              FROM {$bt} b
              LEFT JOIN {$vt} v ON v.id = b.vehicle_id
              LEFT JOIN {$dt} d ON d.id = b.driver_id
@@ -575,6 +625,15 @@ class WPYOGFLEET_DB {
             $end_date = $end_date . ' ' . sanitize_text_field( $data['end_time'] ) . ':00';
         }
 
+        // GST (point: add GST). booking_amount is the pre-GST sub-total entered
+        // by staff. When GST applies, 5% is added on top; gst_amount is stored so
+        // the payable total (booking_amount + gst_amount) never has to be
+        // recomputed downstream.
+        $booking_amount = (float) ( $data['booking_amount'] ?? 0 );
+        $gst_applicable = ! empty( $data['gst_applicable'] ) ? 1 : 0;
+        $gst_rate       = $gst_applicable ? 5.00 : 0.00;
+        $gst_amount     = $gst_applicable ? round( $booking_amount * $gst_rate / 100, 2 ) : 0.00;
+
         return array(
             'booking_type'         => in_array( $data['booking_type'] ?? '', $valid_btype ) ? $data['booking_type'] : 'individual',
             'booking_ref'          => sanitize_text_field( $data['booking_ref'] ?? '' ),
@@ -597,7 +656,10 @@ class WPYOGFLEET_DB {
             'outsourced_driver_name'    => $is_out ? sanitize_text_field( $data['outsourced_driver_name'] ?? '' ) : '',
             'outsourced_driver_mobile'  => $is_out ? sanitize_text_field( $data['outsourced_driver_mobile'] ?? '' ) : '',
             'outsourced_vehicle_number' => $is_out ? sanitize_text_field( $data['outsourced_vehicle_number'] ?? '' ) : '',
-            'booking_amount'       => (float) ( $data['booking_amount'] ?? 0 ),
+            'booking_amount'       => $booking_amount,
+            'gst_applicable'       => $gst_applicable,
+            'gst_rate'             => $gst_rate,
+            'gst_amount'           => $gst_amount,
             'advance_amount'       => (float) ( $data['advance_amount'] ?? 0 ),
             'advance_payment_mode' => in_array( $data['advance_payment_mode'] ?? '', $valid_mode ) ? $data['advance_payment_mode'] : 'cash',
             'advance_received_by'  => sanitize_text_field( $data['advance_received_by'] ?? '' ),
@@ -783,7 +845,7 @@ class WPYOGFLEET_DB {
             'pending_payments'  => (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
                 "SELECT COUNT(*) FROM {$bt} b
                  LEFT JOIN (SELECT booking_id, SUM(amount) AS tp FROM {$pt} WHERE is_voided = 0 GROUP BY booking_id) p ON p.booking_id = b.id
-                 WHERE b.status NOT IN ('cancelled') AND b.is_deleted = 0 AND (b.booking_amount - COALESCE(tp,0)) > 0"
+                 WHERE b.status NOT IN ('cancelled') AND b.is_deleted = 0 AND (b.booking_amount + b.gst_amount - COALESCE(tp,0)) > 0"
             ),
             // Trips starting this calendar month
             'month_bookings'    => (int) $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
@@ -808,14 +870,14 @@ class WPYOGFLEET_DB {
 
         return $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
             "SELECT b.id, b.booking_number, b.customer_name, b.customer_mobile,
-                    b.start_date, b.booking_amount,
+                    b.start_date, (b.booking_amount + b.gst_amount) AS booking_amount,
                     COALESCE(p.total_paid,0) AS total_paid,
-                    (b.booking_amount - COALESCE(p.total_paid,0)) AS balance
+                    (b.booking_amount + b.gst_amount - COALESCE(p.total_paid,0)) AS balance
              FROM {$bt} b
              LEFT JOIN (SELECT booking_id, SUM(amount) AS total_paid FROM {$pt} WHERE is_voided = 0 GROUP BY booking_id) p ON p.booking_id = b.id
              WHERE b.status NOT IN ('cancelled')
                AND b.is_deleted = 0
-               AND (b.booking_amount - COALESCE(p.total_paid,0)) > 0
+               AND (b.booking_amount + b.gst_amount - COALESCE(p.total_paid,0)) > 0
              ORDER BY b.start_date ASC"
         );
     }
@@ -834,7 +896,7 @@ class WPYOGFLEET_DB {
             // filter on start_date. Keeping these on the same date field is what makes the totals
             // reconcile across report tabs for the same period.
             'bookings'       => $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$bt} WHERE DATE(start_date) BETWEEN %s AND %s AND status != 'cancelled' AND is_deleted = 0", $m_s, $m_e ) ), // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-            'booking_amount' => $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(booking_amount),0) FROM {$bt} WHERE DATE(start_date) BETWEEN %s AND %s AND status != 'cancelled' AND is_deleted = 0", $m_s, $m_e ) ), // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+            'booking_amount' => $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(booking_amount + gst_amount),0) FROM {$bt} WHERE DATE(start_date) BETWEEN %s AND %s AND status != 'cancelled' AND is_deleted = 0", $m_s, $m_e ) ), // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             'received'       => $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(amount),0) FROM {$pt} WHERE DATE(payment_date) BETWEEN %s AND %s", $m_s, $m_e ) ), // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             'expenses'       => $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(amount),0) FROM {$et} WHERE DATE(expense_date) BETWEEN %s AND %s", $m_s, $m_e ) ), // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
         );
@@ -856,7 +918,7 @@ class WPYOGFLEET_DB {
         $sql = "
             SELECT d.driver_name, d.mobile,
                 COUNT(b.id)                        AS trips,
-                COALESCE(SUM(b.booking_amount), 0) AS total_amount,
+                COALESCE(SUM(b.booking_amount + b.gst_amount), 0) AS total_amount,
                 COALESCE(SUM(py.tp), 0)            AS total_received,
                 COALESCE(SUM(ex.te), 0)            AS total_expenses
             FROM {$dt} d
@@ -1005,7 +1067,7 @@ class WPYOGFLEET_DB {
         $sql = "
             SELECT v.vehicle_name, v.registration_number,
                 COUNT(b.id)                        AS trips,
-                COALESCE(SUM(b.booking_amount), 0) AS total_amount,
+                COALESCE(SUM(b.booking_amount + b.gst_amount), 0) AS total_amount,
                 COALESCE(SUM(py.tp), 0)            AS total_received,
                 COALESCE(SUM(ex.te), 0)            AS total_expenses
             FROM {$vt} v
@@ -1057,7 +1119,7 @@ class WPYOGFLEET_DB {
         $rows = $wpdb->get_results( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
             "SELECT booking_type,
                     COUNT(*) AS cnt,
-                    COALESCE(SUM(booking_amount), 0) AS total_amount
+                    COALESCE(SUM(booking_amount + gst_amount), 0) AS total_amount
              FROM {$bt}
              WHERE DATE(start_date) BETWEEN %s AND %s
                AND status != 'cancelled'
@@ -1115,7 +1177,7 @@ class WPYOGFLEET_DB {
             $corp_sql = "
                 SELECT COALESCE(c.company_name, 'Corporate (no company set)') AS name,
                     COUNT(b.id)                        AS bookings,
-                    COALESCE(SUM(b.booking_amount), 0) AS total_amount
+                    COALESCE(SUM(b.booking_amount + b.gst_amount), 0) AS total_amount
                 FROM {$bt} b
                 LEFT JOIN {$ct} c ON c.id = b.company_id
                 {$where} AND b.booking_type = 'corporate'
@@ -1141,7 +1203,7 @@ class WPYOGFLEET_DB {
         // Individual bookings — single aggregated row
         if ( $type_filter === 'all' || $type_filter === 'individual' ) {
             $ind_sql = "
-                SELECT COUNT(b.id) AS bookings, COALESCE(SUM(b.booking_amount), 0) AS total_amount
+                SELECT COUNT(b.id) AS bookings, COALESCE(SUM(b.booking_amount + b.gst_amount), 0) AS total_amount
                 FROM {$bt} b
                 {$where} AND b.booking_type = 'individual'
             ";

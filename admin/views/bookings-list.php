@@ -113,7 +113,7 @@ $base_url = admin_url( 'admin.php?' . http_build_query( $base_args ) );
                     <select name="vehicle_id" class="jtb-select">
                         <option value="">All Vehicles</option>
                         <?php foreach ( $vehicles as $v ) : ?>
-                        <option value="<?php echo absint( $v->id ); ?>" <?php selected( $filters['vehicle_id'], $v->id ); ?>><?php echo esc_html($v->vehicle_name); ?></option>
+                        <option value="<?php echo absint( $v->id ); ?>" <?php selected( $filters['vehicle_id'], $v->id ); ?>><?php echo esc_html( $v->vehicle_name . ( $v->registration_number ? ' (' . $v->registration_number . ')' : '' ) ); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>

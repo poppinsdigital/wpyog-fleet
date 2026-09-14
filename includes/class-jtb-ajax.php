@@ -285,13 +285,19 @@ class WPYOGFLEET_Ajax {
         $this->verify();
         $id = absint( $_POST['company_id'] ?? 0 );
         if ( $id ) {
-            WPYOGFLEET_DB::update_company( $id, WPYOGFLEET_Input::company() );
+            $res = WPYOGFLEET_DB::update_company( $id, WPYOGFLEET_Input::company() );
+            if ( is_wp_error( $res ) ) {
+                wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+            }
             $co = WPYOGFLEET_DB::get_company( $id );
             WPYOGFLEET_DB::log_activity( 'company_updated', 'company', $id,
                 $co->company_name ?? 'Company #' . $id, 'Updated via admin AJAX' );
             wp_send_json_success( array( 'id' => $id, 'action' => 'updated', 'company' => $co ) );
         } else {
             $new_id = WPYOGFLEET_DB::insert_company( WPYOGFLEET_Input::company() );
+            if ( is_wp_error( $new_id ) ) {
+                wp_send_json_error( array( 'message' => $new_id->get_error_message() ) );
+            }
             if ( ! $new_id ) {
                 wp_send_json_error( array( 'message' => 'Could not save company.' ) );
             }
@@ -370,20 +376,31 @@ class WPYOGFLEET_Ajax {
 
         ob_start();
         $out = fopen( 'php://output', 'w' );
-        fputcsv( $out, array( 'Booking #', 'Customer', 'Mobile', 'Pickup', 'Drop', 'Trip Type', 'Start Date', 'End Date', 'Vehicle', 'Driver', 'Booking Amount', 'Advance', 'Total Received', 'Balance', 'Expenses', 'Status' ) );
+        fputcsv( $out, array( 'Booking #', 'Customer', 'Customer Type', 'Mobile', 'Pickup', 'Drop', 'Trip Type', 'Start Date', 'End Date', 'Vehicle', 'Vehicle Number', 'Vehicle Source', 'Driver', 'Amount (excl. GST)', 'GST', 'Amount (incl. GST)', 'Advance', 'Total Received', 'Balance', 'Expenses', 'Status' ) );
         foreach ( $bookings as $b ) {
+            $is_out       = ! empty( $b->is_outsourced );
+            $vehicle_name = $is_out ? ( $b->outsourced_vehicle_number ?: '' ) : ( $b->vehicle_name ?? '' );
+            $vehicle_no   = $is_out ? ( $b->outsourced_vehicle_number ?: '' ) : ( $b->registration_number ?: '' );
+            $driver_name  = $is_out ? ( $b->outsourced_driver_name ?: '' ) : ( $b->driver_name ?? '' );
+            $gst_amount   = (float) ( $b->gst_amount ?? 0 );
+            $subtotal     = (float) $b->booking_amount;
             fputcsv( $out, array(
                 $b->booking_number,
                 $b->customer_name,
+                ucfirst( $b->booking_type ?: 'individual' ),
                 $b->customer_mobile,
                 $b->pickup_location,
                 $b->drop_location,
                 WPYOGFLEET_Admin::trip_type_label( $b->trip_type ),
                 $b->start_date,
                 $b->end_date,
-                $b->vehicle_name ?? '',
-                $b->driver_name ?? '',
-                $b->booking_amount,
+                $vehicle_name,
+                $vehicle_no,
+                $is_out ? 'Outsourced' : 'Own',
+                $driver_name,
+                number_format( $subtotal, 2, '.', '' ),
+                number_format( $gst_amount, 2, '.', '' ),
+                number_format( $subtotal + $gst_amount, 2, '.', '' ),
                 $b->advance_amount,
                 $b->total_paid,
                 $b->balance_amount,

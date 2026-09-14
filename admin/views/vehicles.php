@@ -28,6 +28,9 @@ $is_edit  = ! empty( $edit_vehicle );
     <?php if ( $wpyogfleet_notice_ok && ! empty( $_GET['deleted'] ) ) : ?>
     <div class="jtb-notice jtb-notice-success">Vehicle deleted.</div>
     <?php endif; ?>
+    <?php if ( $wpyogfleet_notice_ok && isset( $_GET['error'] ) && 'duplicate' === $_GET['error'] ) : ?>
+    <div class="jtb-notice jtb-notice-error">A vehicle with this name already exists.</div>
+    <?php endif; ?>
 
     <div class="jtb-two-col-layout">
 

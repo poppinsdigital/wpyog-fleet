@@ -83,9 +83,19 @@ $balance = (float)$booking->balance_amount;
     <!-- Summary Cards -->
     <div class="jtb-summary-grid" id="jtb-summary-area">
         <div class="jtb-summary-item">
-            <span class="label">Booking Amount</span>
+            <span class="label">Booking Amount<?php echo ! empty( $booking->gst_applicable ) ? ' (excl. GST)' : ''; ?></span>
             <span class="value"><?php echo esc_html( WPYOGFLEET_Admin::format_currency($booking->booking_amount) ); ?></span>
         </div>
+        <?php if ( ! empty( $booking->gst_applicable ) ) : ?>
+        <div class="jtb-summary-item">
+            <span class="label">GST (<?php echo esc_html( rtrim( rtrim( number_format( (float) $booking->gst_rate, 2 ), '0' ), '.' ) ); ?>%)</span>
+            <span class="value"><?php echo esc_html( WPYOGFLEET_Admin::format_currency($booking->gst_amount) ); ?></span>
+        </div>
+        <div class="jtb-summary-item">
+            <span class="label">Total (incl. GST)</span>
+            <span class="value"><?php echo esc_html( WPYOGFLEET_Admin::format_currency( (float) $booking->booking_amount + (float) $booking->gst_amount ) ); ?></span>
+        </div>
+        <?php endif; ?>
         <div class="jtb-summary-item jtb-received">
             <span class="label">Total Received</span>
             <span class="value"><?php echo esc_html( WPYOGFLEET_Admin::format_currency($booking->total_paid) ); ?></span>

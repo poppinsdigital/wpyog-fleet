@@ -97,6 +97,9 @@ class WPYOGFLEET_Activator {
             advance_amount        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
             advance_payment_mode  ENUM('cash','upi','bank-transfer','card','other') NOT NULL DEFAULT 'cash',
             advance_received_by   VARCHAR(200) DEFAULT '',
+            gst_applicable        TINYINT(1) NOT NULL DEFAULT 0,
+            gst_rate              DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+            gst_amount            DECIMAL(12,2) NOT NULL DEFAULT 0.00,
             booking_ref           VARCHAR(100) DEFAULT '',
             status                ENUM('new','confirmed','ongoing','completed','closed','cancelled') NOT NULL DEFAULT 'new',
             review_request_sent    TINYINT(1) NOT NULL DEFAULT 0,
@@ -220,6 +223,11 @@ class WPYOGFLEET_Activator {
             // v3.4.0 Google review request tracking
             'review_request_sent'    => "ALTER TABLE {$table} ADD COLUMN review_request_sent TINYINT(1) NOT NULL DEFAULT 0 AFTER status",
             'review_request_sent_at' => "ALTER TABLE {$table} ADD COLUMN review_request_sent_at DATETIME DEFAULT NULL AFTER review_request_sent",
+            // v3.5.8 GST on booking amount — booking_amount stays the pre-GST
+            // sub-total; gst_amount is the 5% added on top when applicable.
+            'gst_applicable' => "ALTER TABLE {$table} ADD COLUMN gst_applicable TINYINT(1) NOT NULL DEFAULT 0 AFTER advance_received_by",
+            'gst_rate'       => "ALTER TABLE {$table} ADD COLUMN gst_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER gst_applicable",
+            'gst_amount'     => "ALTER TABLE {$table} ADD COLUMN gst_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER gst_rate",
         );
 
         foreach ( $additions as $col => $sql ) {

@@ -1166,13 +1166,25 @@ class WPYOGFLEET_Frontend {
                     <div class="jtbfe-card__body">
                         <div class="jtbfe-frow">
                             <div class="jtbfe-field">
-                                <label>Total Amount (₹) <span class="req">*</span></label>
+                                <label>Booking Amount (₹, excl. GST) <span class="req">*</span></label>
                                 <input type="number" id="bf-amount" name="booking_amount" class="jtbfe-input" min="0" step="0.01" placeholder="0.00" required>
                             </div>
                             <div class="jtbfe-field">
                                 <label>Advance (₹)</label>
                                 <input type="number" id="bf-advance" name="advance_amount" class="jtbfe-input" min="0" step="0.01" placeholder="0.00">
                             </div>
+                        </div>
+                        <div class="jtbfe-field" style="margin-top:8px">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
+                                <input type="checkbox" id="bf-gst" name="gst_applicable" value="1" style="width:auto;margin:0">
+                                <span>Add GST (5%) on top of the booking amount</span>
+                            </label>
+                        </div>
+                        <div class="jtbfe-balance-bar" id="bf-gst-preview" style="display:none">
+                            <span>GST (5%)</span>
+                            <strong id="bf-gst-val">₹0.00</strong>
+                            <span style="margin-left:auto">Total (incl. GST)</span>
+                            <strong id="bf-total-val">₹0.00</strong>
                         </div>
                         <div id="bf-advance-details" style="display:none;margin-top:12px">
                             <div class="jtbfe-frow">
@@ -1294,6 +1306,9 @@ class WPYOGFLEET_Frontend {
                 'outsourced_vehicle_number' => $b->outsourced_vehicle_number ?? '',
                 'review_request_sent' => (int) ( $b->review_request_sent ?? 0 ),
                 'booking_amount'  => (float) $b->booking_amount,
+                'gst_applicable'  => (int) ( $b->gst_applicable ?? 0 ),
+                'gst_rate'        => (float) ( $b->gst_rate ?? 0 ),
+                'gst_amount'      => (float) ( $b->gst_amount ?? 0 ),
                 'total_paid'      => (float) $b->total_paid,
                 'balance_amount'  => (float) $b->balance_amount,
                 'total_expenses'  => (float) $b->total_expenses,
@@ -1328,7 +1343,10 @@ class WPYOGFLEET_Frontend {
         $this->fe_verify();
         $id = absint( $_POST['company_id'] ?? 0 );
         if ( $id ) {
-            WPYOGFLEET_DB::update_company( $id, WPYOGFLEET_Input::company() );
+            $res = WPYOGFLEET_DB::update_company( $id, WPYOGFLEET_Input::company() );
+            if ( is_wp_error( $res ) ) {
+                wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+            }
             $co = WPYOGFLEET_DB::get_company( $id );
             WPYOGFLEET_DB::log_activity( 'company_updated', 'company', $id,
                 $co->company_name ?? 'Company #' . $id, 'Updated via frontend panel' );
@@ -1347,6 +1365,9 @@ class WPYOGFLEET_Frontend {
             ) );
         } else {
             $new_id = WPYOGFLEET_DB::insert_company( WPYOGFLEET_Input::company() );
+            if ( is_wp_error( $new_id ) ) {
+                wp_send_json_error( array( 'message' => $new_id->get_error_message() ) );
+            }
             if ( ! $new_id ) {
                 wp_send_json_error( array( 'message' => 'Could not save company.' ) );
             }
@@ -1583,13 +1604,15 @@ class WPYOGFLEET_Frontend {
         $this->fe_verify();
         $id = absint( $_POST['vehicle_id'] ?? 0 );
         if ( $id ) {
-            WPYOGFLEET_DB::update_vehicle( $id, WPYOGFLEET_Input::vehicle() );
+            $res = WPYOGFLEET_DB::update_vehicle( $id, WPYOGFLEET_Input::vehicle() );
+            if ( is_wp_error( $res ) ) { wp_send_json_error( array( 'message' => $res->get_error_message() ) ); }
             $v = WPYOGFLEET_DB::get_vehicle( $id );
             WPYOGFLEET_DB::log_activity( 'vehicle_updated', 'vehicle', $id,
                 $v->vehicle_name ?? 'Vehicle #'.$id, 'Updated via frontend' );
             wp_send_json_success( array( 'id' => $id, 'action' => 'updated' ) );
         } else {
             $new_id = WPYOGFLEET_DB::insert_vehicle( WPYOGFLEET_Input::vehicle() );
+            if ( is_wp_error( $new_id ) ) { wp_send_json_error( array( 'message' => $new_id->get_error_message() ) ); }
             if ( ! $new_id ) { wp_send_json_error( array('message'=>'Could not save vehicle.') ); }
             $v = WPYOGFLEET_DB::get_vehicle( $new_id );
             WPYOGFLEET_DB::log_activity( 'vehicle_created', 'vehicle', $new_id,
