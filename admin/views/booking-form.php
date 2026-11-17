@@ -349,6 +349,15 @@ $btype = $booking->booking_type ?? 'individual';
                                         placeholder="Staff name">
                                 </div>
                             </div>
+                            <div class="jtb-field-row">
+                                <div class="jtb-field">
+                                    <label class="jtb-label">Advance Received On</label>
+                                    <?php $wpyogfleet_today = current_time( 'Y-m-d' ); ?>
+                                    <input type="date" name="advance_date" class="jtb-input"
+                                        value="<?php echo esc_attr( ! empty( $booking->advance_date ) ? $booking->advance_date : $wpyogfleet_today ); ?>"
+                                        max="<?php echo esc_attr( $wpyogfleet_today ); ?>">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -97,6 +97,7 @@ class WPYOGFLEET_Activator {
             advance_amount        DECIMAL(12,2) NOT NULL DEFAULT 0.00,
             advance_payment_mode  ENUM('cash','upi','bank-transfer','card','other') NOT NULL DEFAULT 'cash',
             advance_received_by   VARCHAR(200) DEFAULT '',
+            advance_date          DATE DEFAULT NULL,
             gst_applicable        TINYINT(1) NOT NULL DEFAULT 0,
             gst_rate              DECIMAL(5,2) NOT NULL DEFAULT 0.00,
             gst_amount            DECIMAL(12,2) NOT NULL DEFAULT 0.00,
@@ -228,6 +229,8 @@ class WPYOGFLEET_Activator {
             'gst_applicable' => "ALTER TABLE {$table} ADD COLUMN gst_applicable TINYINT(1) NOT NULL DEFAULT 0 AFTER advance_received_by",
             'gst_rate'       => "ALTER TABLE {$table} ADD COLUMN gst_rate DECIMAL(5,2) NOT NULL DEFAULT 0.00 AFTER gst_applicable",
             'gst_amount'     => "ALTER TABLE {$table} ADD COLUMN gst_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00 AFTER gst_rate",
+            // v3.6.0 date the advance was actually received (was always "today").
+            'advance_date'   => "ALTER TABLE {$table} ADD COLUMN advance_date DATE DEFAULT NULL AFTER advance_received_by",
         );
 
         foreach ( $additions as $col => $sql ) {
@@ -282,6 +285,26 @@ class WPYOGFLEET_Activator {
         $wpdb->query( "UPDATE {$table} SET is_deleted = 0 WHERE is_deleted IS NULL" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
         // Default booking_type for existing rows
         $wpdb->query( "UPDATE {$table} SET booking_type = 'individual' WHERE booking_type IS NULL OR booking_type = ''" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+
+        // v3.6.0 — backfill advance_date for bookings that already had an
+        // advance. Use the date on the existing "Advance payment" record (what
+        // Payment History already shows), else the booking's creation date.
+        // Runs after the payments void columns exist; idempotent because only
+        // NULL dates are touched.
+        $cols_now = $wpdb->get_col( "DESCRIBE {$table}", 0 ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        if ( in_array( 'advance_date', (array) $cols_now, true ) && ! empty( $pt_existing ) ) {
+            $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
+                "UPDATE {$table} b
+                 LEFT JOIN (
+                     SELECT booking_id, MIN(payment_date) AS adv_date
+                     FROM {$pt}
+                     WHERE notes = 'Advance payment' AND is_voided = 0
+                     GROUP BY booking_id
+                 ) p ON p.booking_id = b.id
+                 SET b.advance_date = COALESCE(p.adv_date, DATE(b.created_at))
+                 WHERE b.advance_amount > 0 AND b.advance_date IS NULL"
+            );
+        }
     }
 
     private static function create_roles() {

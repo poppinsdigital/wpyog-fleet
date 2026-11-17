@@ -1203,6 +1203,15 @@ class WPYOGFLEET_Frontend {
                                     <input type="text" id="bf-advance-received" name="advance_received_by" class="jtbfe-input" placeholder="Staff name">
                                 </div>
                             </div>
+                            <div class="jtbfe-frow">
+                                <div class="jtbfe-field">
+                                    <label>Advance Received On</label>
+                                    <?php $wpyogfleet_today = current_time( 'Y-m-d' ); ?>
+                                    <input type="date" id="bf-advance-date" name="advance_date" class="jtbfe-input"
+                                        value="<?php echo esc_attr( $wpyogfleet_today ); ?>"
+                                        max="<?php echo esc_attr( $wpyogfleet_today ); ?>">
+                                </div>
+                            </div>
                         </div>
                         <div class="jtbfe-balance-bar" id="bf-balance-bar">
                             <span>Balance Due</span>

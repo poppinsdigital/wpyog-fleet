@@ -76,7 +76,7 @@ class WPYOGFLEET_Input {
                 'pickup_location', 'drop_location', 'trip_type', 'start_date', 'start_time',
                 'end_date', 'end_time', 'vehicle_id', 'driver_id', 'is_outsourced', 'vehicle_source',
                 'outsourced_driver_name', 'outsourced_driver_mobile', 'outsourced_vehicle_number',
-                'booking_amount', 'gst_applicable', 'advance_amount', 'advance_payment_mode', 'advance_received_by', 'status',
+                'booking_amount', 'gst_applicable', 'advance_amount', 'advance_payment_mode', 'advance_received_by', 'advance_date', 'status',
             ) ),
             self::textarea_fields( array( 'notes' ) )
         );

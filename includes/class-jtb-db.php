@@ -486,15 +486,20 @@ class WPYOGFLEET_DB {
         $row = self::sanitize_booking( $data );
         $row['booking_number'] = self::generate_booking_number();
         $row['created_by']     = get_current_user_id();
+        // No advance date sent (older clients) → today, same as before.
+        if ( $row['advance_amount'] > 0 && empty( $row['advance_date'] ) ) {
+            $row['advance_date'] = current_time( 'Y-m-d' );
+        }
         $wpdb->insert( $wpdb->prefix . 'jtb_bookings', $row ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
         $new_id = $wpdb->insert_id;
 
         // Auto-create a payment record for the advance amount so it appears
         // in Payment History and is counted in total_paid / balance_amount.
+        // Its date is the day the advance was received.
         if ( $new_id && $row['advance_amount'] > 0 ) {
             $wpdb->insert( $wpdb->prefix . 'jtb_payments', array( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
                 'booking_id'      => $new_id,
-                'payment_date'    => current_time( 'Y-m-d' ),
+                'payment_date'    => $row['advance_date'],
                 'amount'          => $row['advance_amount'],
                 'payment_mode'    => ! empty( $row['advance_payment_mode'] ) ? $row['advance_payment_mode'] : 'cash',
                 'received_by'     => ! empty( $row['advance_received_by'] ) ? $row['advance_received_by'] : '',
@@ -510,6 +515,12 @@ class WPYOGFLEET_DB {
     public static function update_booking( $id, $data ) {
         global $wpdb;
         $row    = self::sanitize_booking( $data );
+        // Stored advance date before this save — used below to tell whether
+        // staff actually changed it (vs. re-saving the booking unchanged).
+        $old_advance_date = empty( $row['advance_date'] ) ? null : $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+            "SELECT advance_date FROM {$wpdb->prefix}jtb_bookings WHERE id = %d",
+            $id
+        ) );
         $result = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->prefix . 'jtb_bookings',
             $row,
@@ -523,10 +534,29 @@ class WPYOGFLEET_DB {
                 "SELECT COUNT(*) FROM {$pt} WHERE booking_id = %d AND notes = 'Advance payment' AND is_voided = 0",
                 $id
             ) );
+            if ( $count && ! empty( $row['advance_date'] ) && $row['advance_date'] !== $old_advance_date ) {
+                // Advance already recorded and staff changed its date on the
+                // booking — move the Payment History entry to match. An
+                // unchanged date never touches the payment, so a date edited
+                // directly in Payment History is not overwritten.
+                $wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                    "UPDATE {$pt} SET payment_date = %s WHERE booking_id = %d AND notes = 'Advance payment' AND is_voided = 0 AND payment_date <> %s",
+                    $row['advance_date'], $id, $row['advance_date']
+                ) );
+            }
             if ( ! $count ) {
+                $advance_date = ! empty( $row['advance_date'] ) ? $row['advance_date'] : current_time( 'Y-m-d' );
+                if ( empty( $row['advance_date'] ) ) {
+                    // Caller sent no date: record today on the booking too, but
+                    // never overwrite a date that is already stored.
+                    $wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                        "UPDATE {$wpdb->prefix}jtb_bookings SET advance_date = %s WHERE id = %d AND advance_date IS NULL",
+                        $advance_date, $id
+                    ) );
+                }
                 $wpdb->insert( $pt, array( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
                     'booking_id'      => $id,
-                    'payment_date'    => current_time( 'Y-m-d' ),
+                    'payment_date'    => $advance_date,
                     'amount'          => $row['advance_amount'],
                     'payment_mode'    => ! empty( $row['advance_payment_mode'] ) ? $row['advance_payment_mode'] : 'cash',
                     'received_by'     => ! empty( $row['advance_received_by'] ) ? $row['advance_received_by'] : '',
@@ -634,7 +664,7 @@ class WPYOGFLEET_DB {
         $gst_rate       = $gst_applicable ? 5.00 : 0.00;
         $gst_amount     = $gst_applicable ? round( $booking_amount * $gst_rate / 100, 2 ) : 0.00;
 
-        return array(
+        $row = array(
             'booking_type'         => in_array( $data['booking_type'] ?? '', $valid_btype ) ? $data['booking_type'] : 'individual',
             'booking_ref'          => sanitize_text_field( $data['booking_ref'] ?? '' ),
             'customer_name'        => sanitize_text_field( $is_corp ? ( $data['corp_customer_name'] ?? $data['customer_name'] ?? '' ) : ( $data['customer_name'] ?? '' ) ),
@@ -666,6 +696,28 @@ class WPYOGFLEET_DB {
             'status'               => in_array( $data['status'] ?? '', $valid_stat ) ? $data['status'] : 'new',
             'notes'                => sanitize_textarea_field( $data['notes'] ?? '' ),
         );
+
+        // advance_date (v3.6.0) is only written when the caller actually sent a
+        // valid date with an advance. Callers that don't know about it (older
+        // app builds, status-only flows) therefore never blank a stored date —
+        // insert_booking() falls back to today, exactly as before.
+        $advance_date = self::valid_date( $data['advance_date'] ?? '' );
+        if ( $advance_date && $row['advance_amount'] > 0 ) {
+            $row['advance_date'] = $advance_date;
+        }
+
+        return $row;
+    }
+
+    /**
+     * Returns a Y-m-d string for a real calendar date, or null.
+     */
+    private static function valid_date( $value ) {
+        $value = sanitize_text_field( (string) $value );
+        if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m ) ) {
+            return null;
+        }
+        return checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ? $value : null;
     }
 
     // -------------------------------------------------------------------------
@@ -735,11 +787,29 @@ class WPYOGFLEET_DB {
             'transaction_ref' => sanitize_text_field( $data['transaction_ref'] ?? '' ),
             'notes'           => sanitize_textarea_field( $data['notes'] ?? '' ),
         );
-        return $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+        $result = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->prefix . 'jtb_payments',
             $row,
             array( 'id' => absint( $id ) )
         );
+
+        // If this is the booking's advance payment, keep the booking's
+        // advance_date in step so the booking form shows the same date.
+        if ( false !== $result ) {
+            $pt  = $wpdb->prefix . 'jtb_payments';
+            $adv = $wpdb->get_row( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                "SELECT booking_id, payment_date FROM {$pt} WHERE id = %d AND notes = 'Advance payment' AND is_voided = 0",
+                absint( $id )
+            ) );
+            if ( $adv && self::valid_date( $adv->payment_date ) ) {
+                $wpdb->query( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+                    "UPDATE {$wpdb->prefix}jtb_bookings SET advance_date = %s WHERE id = %d AND advance_amount > 0",
+                    $adv->payment_date, (int) $adv->booking_id
+                ) );
+            }
+        }
+
+        return $result;
     }
 
     // -------------------------------------------------------------------------

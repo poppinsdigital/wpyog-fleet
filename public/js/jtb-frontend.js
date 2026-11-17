@@ -712,6 +712,8 @@
                 $('#bf-advance').val(b.advance_amount);
                 if (b.advance_payment_mode) $('#bf-advance-mode').val(b.advance_payment_mode);
                 $('#bf-advance-received').val(b.advance_received_by || '');
+                // Older bookings without a stored date keep the form's default (today).
+                if (b.advance_date) $('#bf-advance-date').val(String(b.advance_date).substring(0, 10));
                 $('#bf-notes').val(b.notes);
                 // Date + time split
                 if (b.start_date) {
@@ -872,7 +874,8 @@
             advance_amount:       $('#bf-advance').val() || 0,
             advance_payment_mode: $('#bf-advance-mode').val() || 'cash',
             advance_received_by:  $('#bf-advance-received').val(),
-            notes:                $('#bf-notes').val(),
+            advance_date:         $('#bf-advance-date').val() || '',
+            notes:               $('#bf-notes').val(),
         };
 
         post('wpyogfleet_fe_save_booking', data, function (res) {
@@ -962,6 +965,7 @@
                 : row('Vehicle', (b.registration_number ? '<strong>' + esc(b.registration_number) + '</strong>' + (b.vehicle_name ? ' <span style="color:#94a3b8;font-size:12px">(' + esc(b.vehicle_name) + ')</span>' : '') : esc(b.vehicle_name || '—')))
                   + row('Driver', esc(b.driver_name || '—')))
             + row('Advance Paid', fmt(b.advance_amount))
+            + (parseFloat(b.advance_amount) > 0 && b.advance_date ? row('Advance Received On', fmtDate(b.advance_date)) : '')
             + (b.notes ? row('Notes', '<em>' + esc(b.notes) + '</em>') : '')
             + '</div></div></div>';
 

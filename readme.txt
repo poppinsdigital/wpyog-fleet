@@ -4,7 +4,7 @@ Tags: booking manager, taxi booking, cab booking, fleet management, vehicle book
 Requires at least: 5.6
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 3.5.9
+Stable tag: 3.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -185,6 +185,10 @@ Yes. All strings are internationalised using the `wpyog-fleet` text domain and a
 12. Admin Settings — company name, booking prefix, ops contact, Google review link
 
 == Changelog ==
+
+= 3.6.0 =
+* Advance date: the booking form now asks when the advance was received ("Advance Received On", defaults to today). The automatic "Advance payment" entry in Payment History uses this date instead of always using the day the booking was saved. Changing the date on the booking moves that payment entry, and editing the advance payment's date in Payment History updates the booking. Shown on the booking detail page.
+* Stored as a new advance_date column added automatically on upgrade. Existing bookings with an advance are backfilled from their current advance payment date, so nothing changes for them. Clients that don't send a date (e.g. older mobile app builds) keep the previous behaviour.
 
 = 3.5.9 =
 * readme.txt: bumped "Tested up to" to 7.1 to clear the WordPress.org Plugin Check "outdated_tested_upto_header" error — no functional or visual changes

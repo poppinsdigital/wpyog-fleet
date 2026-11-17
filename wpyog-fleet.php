@@ -3,7 +3,7 @@
  * Plugin Name:       WPYog Fleet – Booking Manager for Taxi, Cab & Travel Businesses
  * Plugin URI:        https://demo.poppinsdigital.com/wpyog-fleet/
  * Description:       Manage bookings, vehicles, drivers, payments, advances, balances, and trip expenses from inside your WordPress dashboard.
- * Version:           3.5.9
+ * Version:           3.6.0
  * Requires at least: 5.6
  * Requires PHP:      7.4
  * Author:            Poppins Digital
@@ -17,7 +17,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Constants
-define( 'WPYOGFLEET_VERSION',     '3.5.9' );
+define( 'WPYOGFLEET_VERSION',     '3.6.0' );
 define( 'WPYOGFLEET_PLUGIN_FILE', __FILE__ );
 define( 'WPYOGFLEET_PLUGIN_DIR',  plugin_dir_path( __FILE__ ) );
 define( 'WPYOGFLEET_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );

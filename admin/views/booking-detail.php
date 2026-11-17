@@ -276,6 +276,12 @@ $balance = (float)$booking->balance_amount;
                             <span class="jtb-info-label">Advance Paid</span>
                             <span class="jtb-info-value"><?php echo esc_html( WPYOGFLEET_Admin::format_currency($booking->advance_amount) ); ?></span>
                         </div>
+                        <?php if ( (float) $booking->advance_amount > 0 && ! empty( $booking->advance_date ) ) : ?>
+                        <div class="jtb-info-item">
+                            <span class="jtb-info-label">Advance Received On</span>
+                            <span class="jtb-info-value"><?php echo esc_html( WPYOGFLEET_Admin::format_date( $booking->advance_date ) ); ?></span>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
