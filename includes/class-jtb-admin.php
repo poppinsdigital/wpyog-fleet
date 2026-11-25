@@ -197,7 +197,8 @@ class WPYOGFLEET_Admin {
                     ? WPYOGFLEET_DB::update_vehicle( $id, WPYOGFLEET_Input::vehicle() )
                     : WPYOGFLEET_DB::insert_vehicle( WPYOGFLEET_Input::vehicle() );
                 if ( is_wp_error( $res ) ) {
-                    wp_safe_redirect( admin_url( 'admin.php?page=wpyogfleet-vehicles&error=duplicate&_wpnonce=' . wp_create_nonce( 'wpyogfleet_notice' ) ) );
+                    $err = 'missing_registration' === $res->get_error_code() ? 'missing_reg' : 'duplicate';
+                    wp_safe_redirect( admin_url( 'admin.php?page=wpyogfleet-vehicles&error=' . $err . '&_wpnonce=' . wp_create_nonce( 'wpyogfleet_notice' ) ) );
                     exit;
                 }
                 wp_safe_redirect( admin_url( 'admin.php?page=wpyogfleet-vehicles&saved=1&_wpnonce=' . wp_create_nonce( 'wpyogfleet_notice' ) ) );

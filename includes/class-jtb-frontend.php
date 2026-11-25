@@ -798,7 +798,7 @@ class WPYOGFLEET_Frontend {
                         <input type="hidden" id="vfe-id">
                         <div class="jtbfe-frow">
                             <div class="jtbfe-field">
-                                <label>Vehicle Name <span class="req">*</span></label>
+                                <label>Vehicle Name</label>
                                 <input type="text" id="vfe-name" class="jtbfe-input" placeholder="e.g. Toyota Innova Crysta">
                             </div>
                             <div class="jtbfe-field">
@@ -812,8 +812,8 @@ class WPYOGFLEET_Frontend {
                         </div>
                         <div class="jtbfe-frow">
                             <div class="jtbfe-field">
-                                <label>Registration Number</label>
-                                <input type="text" id="vfe-reg" class="jtbfe-input" placeholder="MP 09 XX 0000">
+                                <label>Registration Number <span class="req">*</span></label>
+                                <input type="text" id="vfe-reg" required class="jtbfe-input" placeholder="MP 09 XX 0000">
                             </div>
                             <div class="jtbfe-field">
                                 <label>Owner Type</label>

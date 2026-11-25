@@ -1880,14 +1880,15 @@
 
     function saveVehicle() {
         var name = $('#vfe-name').val().trim();
-        if (!name) { toast('Vehicle name is required.', 'error'); return; }
+        var reg  = $('#vfe-reg').val().trim();
+        if (!reg) { toast('Registration number is required.', 'error'); $('#vfe-reg').focus(); return; }
         var $btn = $('#jtbfe-save-vehicle').prop('disabled', true).text('Saving…');
 
         post('wpyogfleet_fe_save_vehicle', {
             vehicle_id:          $('#vfe-id').val(),
             vehicle_name:        name,
             vehicle_type:        $('#vfe-type').val(),
-            registration_number: $('#vfe-reg').val(),
+            registration_number: reg,
             owner_type:          $('#vfe-owner').val(),
             vendor_name:         $('#vfe-vendor-name').val(),
             vendor_mobile:       $('#vfe-vendor-mobile').val(),

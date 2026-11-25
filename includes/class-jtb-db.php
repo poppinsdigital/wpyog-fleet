@@ -53,28 +53,49 @@ class WPYOGFLEET_DB {
     }
 
     /**
-     * True (the matching id) when another vehicle already uses this name.
-     * Case-insensitive; [$exclude_id] lets an edit keep its own name.
+     * Normalised key for comparing registration numbers:
+     * upper-case with spaces, hyphens and dots removed ("mp 09-ab 1234" → "MP09AB1234").
      */
-    public static function vehicle_name_exists( $name, $exclude_id = 0 ) {
+    public static function registration_key( $reg ) {
+        return strtoupper( preg_replace( '/[\s\-.]+/', '', sanitize_text_field( (string) $reg ) ) );
+    }
+
+    /**
+     * The matching id when another vehicle already uses this registration number.
+     * Ignores case, spaces, hyphens and dots; [$exclude_id] lets an edit keep its own number.
+     */
+    public static function registration_number_exists( $reg, $exclude_id = 0 ) {
         global $wpdb;
-        $name = trim( (string) $name );
-        if ( '' === $name ) {
+        $key = self::registration_key( $reg );
+        if ( '' === $key ) {
             return false;
         }
         $t  = $wpdb->prefix . 'jtb_vehicles';
         $id = $wpdb->get_var( $wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
-            "SELECT id FROM {$t} WHERE LOWER(vehicle_name) = LOWER(%s) AND id != %d LIMIT 1",
-            $name,
+            "SELECT id FROM {$t} WHERE UPPER(REPLACE(REPLACE(REPLACE(registration_number,' ',''),'-',''),'.','')) = %s AND id != %d LIMIT 1",
+            $key,
             absint( $exclude_id )
         ) );
         return $id ? (int) $id : false;
     }
 
+    /** Required + unique registration number check shared by insert and update. */
+    private static function validate_vehicle( $data, $exclude_id = 0 ) {
+        $reg = $data['registration_number'] ?? '';
+        if ( '' === self::registration_key( $reg ) ) {
+            return new WP_Error( 'missing_registration', 'Registration number is required.' );
+        }
+        if ( self::registration_number_exists( $reg, $exclude_id ) ) {
+            return new WP_Error( 'duplicate_vehicle', 'A vehicle with this registration number already exists.' );
+        }
+        return true;
+    }
+
     public static function insert_vehicle( $data ) {
         global $wpdb;
-        if ( self::vehicle_name_exists( $data['vehicle_name'] ?? '' ) ) {
-            return new WP_Error( 'duplicate_vehicle', 'A vehicle with this name already exists.' );
+        $valid = self::validate_vehicle( $data );
+        if ( is_wp_error( $valid ) ) {
+            return $valid;
         }
         $wpdb->insert( $wpdb->prefix . 'jtb_vehicles', self::sanitize_vehicle( $data ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
         return $wpdb->insert_id;
@@ -82,8 +103,9 @@ class WPYOGFLEET_DB {
 
     public static function update_vehicle( $id, $data ) {
         global $wpdb;
-        if ( self::vehicle_name_exists( $data['vehicle_name'] ?? '', $id ) ) {
-            return new WP_Error( 'duplicate_vehicle', 'A vehicle with this name already exists.' );
+        $valid = self::validate_vehicle( $data, $id );
+        if ( is_wp_error( $valid ) ) {
+            return $valid;
         }
         return $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter
             $wpdb->prefix . 'jtb_vehicles',
@@ -98,10 +120,13 @@ class WPYOGFLEET_DB {
     }
 
     private static function sanitize_vehicle( $data ) {
+        $reg  = strtoupper( preg_replace( '/\s+/', ' ', trim( sanitize_text_field( $data['registration_number'] ?? '' ) ) ) );
+        $name = sanitize_text_field( $data['vehicle_name'] ?? '' );
         return array(
-            'vehicle_name'        => sanitize_text_field( $data['vehicle_name'] ?? '' ),
+            // Name is optional now; fall back to the registration number so lists/labels never show blank.
+            'vehicle_name'        => '' !== $name ? $name : $reg,
             'vehicle_type'        => sanitize_text_field( $data['vehicle_type'] ?? '' ),
-            'registration_number' => sanitize_text_field( $data['registration_number'] ?? '' ),
+            'registration_number' => $reg,
             'owner_type'          => in_array( $data['owner_type'] ?? '', array( 'own', 'outsourced' ) ) ? $data['owner_type'] : 'own',
             'vendor_name'         => sanitize_text_field( $data['vendor_name'] ?? '' ),
             'vendor_mobile'       => sanitize_text_field( $data['vendor_mobile'] ?? '' ),

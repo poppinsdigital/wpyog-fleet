@@ -29,7 +29,10 @@ $is_edit  = ! empty( $edit_vehicle );
     <div class="jtb-notice jtb-notice-success">Vehicle deleted.</div>
     <?php endif; ?>
     <?php if ( $wpyogfleet_notice_ok && isset( $_GET['error'] ) && 'duplicate' === $_GET['error'] ) : ?>
-    <div class="jtb-notice jtb-notice-error">A vehicle with this name already exists.</div>
+    <div class="jtb-notice jtb-notice-error">A vehicle with this registration number already exists.</div>
+    <?php endif; ?>
+    <?php if ( $wpyogfleet_notice_ok && isset( $_GET['error'] ) && 'missing_reg' === $_GET['error'] ) : ?>
+    <div class="jtb-notice jtb-notice-error">Registration number is required.</div>
     <?php endif; ?>
 
     <div class="jtb-two-col-layout">
@@ -109,8 +112,8 @@ $is_edit  = ! empty( $edit_vehicle );
 
                     <div class="jtb-field-row">
                         <div class="jtb-field">
-                            <label class="jtb-label">Vehicle Name *</label>
-                            <input type="text" name="vehicle_name" class="jtb-input" required
+                            <label class="jtb-label">Vehicle Name</label>
+                            <input type="text" name="vehicle_name" class="jtb-input"
                                 value="<?php echo esc_attr($edit_vehicle->vehicle_name ?? ''); ?>"
                                 placeholder="e.g. Toyota Innova">
                         </div>
@@ -125,8 +128,8 @@ $is_edit  = ! empty( $edit_vehicle );
                         </div>
                     </div>
                     <div class="jtb-field">
-                        <label class="jtb-label">Registration Number</label>
-                        <input type="text" name="registration_number" class="jtb-input"
+                        <label class="jtb-label">Registration Number *</label>
+                        <input type="text" name="registration_number" class="jtb-input" required
                             value="<?php echo esc_attr($edit_vehicle->registration_number ?? ''); ?>"
                             placeholder="e.g. MP 09 AB 1234">
                     </div>
